@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Corretor Ortográfico</title>
+    <style>
+        body {
+            flex-direction: column;
+            margin: 0;
+            padding: 0;
+            font-family: Sans-serif;
+            background: linear-gradient(90deg, rgba(2,0,36,1) 0%, rgba(9,9,121,1) 35%, rgba(0,212,255,1) 100%);
+        }
+        * {
+            margin: 0;
+        }
+        .container {
+            width: 100%;
+            padding-top: 100px;
+        }
+        .card {
+            width: 600px;
+            margin: auto;
+            padding: 24px;
+            background: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+        }
+        .main {
+            margin-top: 12px;
+        }
+        .alert {
+            color: red;
+        }
+        #editor {
+            transition: 200ms;
+        }
+        .hide {
+            display: none;
+        }
+        .show {
+            display: block;
+        }
+        .show-mask {
+            display: flex;
+        }
+        .mask {
+            position: fixed;
+            top: 0px;
+            width: 100%;
+            height: 100%;
+            padding: 0px;
+            margin: 0px;
+            background: #666;
+            overflow: hidden;
+            opacity: 0.7;
+            z-index: 98;
+            
+            justify-items: center;
+            text-align: center;
+            align-items: center;
+            flex-direction: column;
+        }
+    </style>
+
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+</head>
+<body>
+    <div id="mask" class="mask hide">
+        <div style="margin: auto;">
+            <img style="z-index: 99; margin: auto; width: 64px;" src="https://raw.githubusercontent.com/Codelessly/FlutterLoadingGIFs/master/packages/cupertino_activity_indicator.gif" alt="loading">
+            <h3 style="margin: auto; color: white">Carregando arquivo...</h3>
+        </div>
+    </div>
+    <div class="container">
+        <div class="card">
+            <h3>Corretor Ortográfico</h3>
+            <div class="main">
+                <div id="dicContainer">
+                    <label for="dic">Insira o arquivo do dicionário: (o carregamento pode demorar)</label>
+                    <input type="file" id="dic">
+                </div>
+                <div id="editorContainer" class="hide">
+                    <ul>
+                        <li>Ao digitar uma palavra, aperte espaço</li>
+                        <li>Caso a última palavra não exista, serão dadas sugestões</li>
+                    </ul>
+                    <br>
+                    <div id="editor">
+                    </div>
+                </div>
+            </div>
+            <small id="alert" class="alert"></small>
+        </div>
+    </div>
+</body>
+</html>
+
+
+<script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+
+<script>
+  var quill = new Quill('#editor', {
+    theme: 'snow'
+  });
+</script>
+
+<script>
+
+    var hashTable = {};
+    var allWords = [];
+
+    document.getElementById("dic").addEventListener('change', function() {
+        document.getElementById("mask").className = "mask show-mask";
+        var fr = new FileReader();
+        fr.onload = function(){
+            hashTable = loadHashTable(fr.result);
+            document.getElementById("dicContainer").className = "hide";
+            document.getElementById("editorContainer").className = "show";
+            document.getElementById("mask").className = "mask hide";
+        }
+            
+        fr.readAsText(this.files[0]);
+    });
+
+    String.prototype.hashCode = function() {
+        let hash = 0;
+        for (let i = 0; i < this.length; i++) {
+            hash += this.charCodeAt(i);
+        }
+        return hash % 980931;
+    };
+
+    class HashTable {
+        constructor() {
+            this.table = new Array(980931);
+            this.size = 0;
+        }
+
+        set(key, value) {
+            const index = key.hashCode();
+            if (this.table[index]) {
+                for (let i = 0; i < this.table[index].length; i++) {
+                    if (this.table[index][i][0] === key) {
+                        this.table[index][i][1] = value;
+                        return;
+                    }
+                }
+                this.table[index].push([key, value]);
+            } else {
+                this.table[index] = [];
+                this.table[index].push([key, value]);
+            }
+            this.size++;
+        }
+
+        get(key) {
+            const index = key.hashCode();
+            if (this.table[index]) {
+                for (let i = 0; i < this.table.length; i++) {
+                        if (this.table[index][i][0] === key) {
+                        return this.table[index][i][1];
+                    }
+                }
+            }
+            return undefined;
+        }
+        
+        getByHash(index) {
+            if (this.table[index]) {
+                return this.table[index];
+            }
+            return undefined;
+        }
+    }
+
+    function loadHashTable(rawDictionary) {
+        console.log(rawDictionary);
+        hashTable = new HashTable();
+        nColl = 0;
+
+        var words = rawDictionary.split('\n');
+        for (const i in words) {
+            word = words[i];
+            hashCode = word.hashCode();
+            
+            allWords.push(word);
+            hashTable.set(word);
+        }
+
+        console.log("> Dictionary Loaded with Success!");
+        
+        return hashTable;
+    }
+
+    function getSuggestion(hash, typedWord) {
+        let newHash = hash;
+        let suggestionWord = this.hashTable.getByHash(newHash);
+        let i = 0, k = 1000;
+        palavras = []
+        while( i < 1000) {
+            if(suggestionWord != undefined){
+                for(let i = 0; i < suggestionWord.length; i++){
+                    if(typedWord.length == suggestionWord[i][0].length){
+                        let tam = 0
+                        for(let k = 0; k < typedWord.length; k++){
+                            if(typedWord[k] == suggestionWord[i][0][k]){
+                                tam += 1
+                            }
+                        }
+
+                        if(tam == typedWord.length -1){
+                            palavras.push(suggestionWord[i][0])
+                        }
+                        else if(typedWord.length == 6){
+                            if(tam == typedWord.length -1 || tam == typedWord.length -2){
+                                palavras.push(suggestionWord[i][0])
+                            }
+                        }
+                        else if(typedWord.length > 6 && typedWord.length < 10){
+                            if(tam == typedWord.length -1 || tam == typedWord.length -2 || tam == typedWord.length -3){
+                                palavras.push(suggestionWord[i][0])
+                            }
+                        }
+                        else if(typedWord.length >= 10 && typedWord.length < 15){
+                            if(tam == typedWord.length -1 || tam == typedWord.length -2 || tam == typedWord.length -3 || tam == typedWord.length -4){
+                                palavras.push(suggestionWord[i][0])
+                            }
+                        }
+                        else if(typedWord.length >= 15 ){
+                            for(let j = 1; j < 10; j++){
+                                if(tam == typedWord.length - j){
+                                    palavras.push(suggestionWord[i][0])
+                                }
+                            }
+                            
+                        }
+                    }
+                }
+                
+            }
+            newHash += 1;
+            suggestionWord = this.hashTable.getByHash(newHash);
+            i+=1;
+        }
+            
+        newHash = hash;
+        suggestionWord = this.hashTable.getByHash(newHash);
+        while(k != 0 ){
+            if(suggestionWord != undefined){
+                for(let i = 0; i < suggestionWord.length; i++){
+                    if(typedWord.length == suggestionWord[i][0].length){
+                        let tam = 0
+
+                        for(let k = 0; k < typedWord.length; k++){
+                            if(suggestionWord[i][0] == 'alves'){
+                                console.log(suggestionWord[i][0][k])
+                            }
+
+                            if(typedWord[k] == suggestionWord[i][0][k]){
+                                tam += 1
+                            }
+                        }
+
+                        if(  tam == typedWord.length -1){
+                            palavras.push(suggestionWord[i][0])
+                        }
+                        else if(typedWord.length == 6){
+                            if(tam == typedWord.length -1 || tam == typedWord.length -2){
+                                palavras.push(suggestionWord[i][0])
+                            }
+                        }
+                        else if(typedWord.length > 6 && typedWord.length < 10){
+                            if(tam == typedWord.length -1 || tam == typedWord.length -2 || tam == typedWord.length -3){
+                                palavras.push(suggestionWord[i][0])
+                            }
+                        }
+                        else if(typedWord.length >= 10 && typedWord.length < 15){
+                            if(tam == typedWord.length -1 || tam == typedWord.length -2 || tam == typedWord.length -3 || tam == typedWord.length -4){
+                                palavras.push(suggestionWord[i][0])
+                            }
+                        }
+                        else if(typedWord.length >= 15){
+                            for(let j = 1; j < 10; j++){
+                                if(tam == typedWord.length - j){
+                                    palavras.push(suggestionWord[i][0])
+                                }
+                            }
+                            
+                        }
+                    }
+                }
+                
+            }
+            newHash -= 1;
+            suggestionWord = this.hashTable.getByHash(newHash);
+            k -=1;
+        }
+
+        return palavras;
+    }
+
+    quill.on('text-change', function(delta, oldDelta, source) {
+        document.getElementById("alert").innerHTML = "";
+        text = quill.getText();
+        typedKey = text[text.length - 2];
+        console.log(typedKey);
+        if(typedKey == " "){
+            trimmedText = text.trim();
+            splitedText = trimmedText.split(' ');
+            typedWord = splitedText[splitedText.length - 1];
+            typedWord = typedWord
+                .replaceAll(/[^\w\s]/gi, '')
+                .toLowerCase();
+            typedWordHash = typedWord.hashCode();
+
+            console.log("> Word:", typedWord);
+            console.log("> " + typedWord + " HashCode:", typedWordHash);
+
+            if(allWords.includes(typedWord)) {
+                console.log("> Word exists!");
+            } else {
+                let suggestionWords = getSuggestion(typedWordHash, typedWord);
+                if(suggestionWords.length > 10) {
+                    suggestionWords = suggestionWords.slice(0, 10);
+                }
+                if(suggestionWords.length) {
+                    console.log("> "+ typedWord +". Sugestões:", suggestionWords);
+                    let suggestionsLinks = "";
+                    suggestionWords.forEach(word => {
+                        suggestionsLinks += `<a href="#"" onclick="trocaPalavra('${word}', '${typedWord}')">${word}</a>, `;
+                    });
+                    suggestionsLinks = suggestionsLinks.slice(0, suggestionsLinks.length - 3)
+                    document.getElementById("alert").innerHTML = "'"+ typedWord +"'' não existe.<br> Sugestões: " + suggestionsLinks;
+                } else {
+                    document.getElementById("alert").innerHTML = "Palavra não existe. Sem sugestões.";
+                }
+            }
+        }
+    });
+
+    function trocaPalavra(newWord, wordToChange) {
+        let text = quill.getText();
+        text = text.replaceAll(wordToChange.toLowerCase, newWord);
+        quill.setText(text);
+        document.getElementById("alert").innerHTML = "";
+    }
+</script>
